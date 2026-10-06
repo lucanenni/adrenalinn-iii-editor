@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AdrenaLinn III — Web Editor</title>
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#e8502a">
+<script>
+(function(){
+  try {
+    if (localStorage.getItem('al3-theme') === 'light')
+      document.documentElement.setAttribute('data-theme', 'light');
+  } catch(e) {}
+})();
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0d0f;--bg2:#141418;--bg3:#1c1c22;
+  --border:#2a2a35;--border2:#3a3a48;
+  --accent:#e8502a;--accent2:#ff7a52;
+  --green:#3ecf6a;--amber:#f0a030;--blue:#4a9eff;
+  --text:#e8e8ec;--text2:#9090a0;--text3:#5a5a68;
+  --led-off:#1a1a22;--led-green:#22ff66;--led-red:#ff3333;--led-amber:#ffaa00;
+  --font-ui:'DM Mono','Courier New',monospace;
+  --font-label:'DM Sans',system-ui,sans-serif;
+  --radius:6px;
+  --r:6px;
+}
+:root[data-theme="light"]{
+  --bg:#f4f5f7;--bg2:#ffffff;--bg3:#eef0f3;
+  --border:#dde1e6;--border2:#c7ccd3;
+  --accent:#e8502a;--accent2:#c8461f;
+  --green:#1f9e52;--amber:#b9791a;--blue:#2f7fe0;
+  --text:#1a1b1f;--text2:#585c66;--text3:#84899a;
+  --led-off:#d0d3d9;
+}
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;600;700&display=swap');
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-label);font-size:13px}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ── Layout ── */
+.app{min-height:100vh;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr auto;grid-template-areas:"header""main""footer"}
+
+/* ── Header ── */
+.header{
+  grid-area:header;background:var(--bg2);border-bottom:1px solid var(--border);
+  padding:0 16px;display:flex;align-items:center;gap:12px;
+  height:50px;position:sticky;top:0;z-index:100;
+}
+.logo{display:flex;align-items:center;gap:8px;font-family:var(--font-ui);font-size:14px;font-weight:500;letter-spacing:.06em;color:var(--accent2);flex-shrink:0}
+.logo svg{width:26px;height:26px}
+.hdiv{width:1px;height:26px;background:var(--border)}
+.device-badge{display:flex;align-items:center;gap:7px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:4px 9px;font-family:var(--font-ui);font-size:11px;min-width:180px}
+.device-badge .led{width:7px;height:7px;border-radius:50%;background:var(--led-off);flex-shrink:0;transition:background .3s}
+.device-badge.connected .led{background:var(--led-green);box-shadow:0 0 6px var(--led-green)}
+.device-badge.error .led{background:var(--led-red)}
+.device-badge .name{color:var(--text2)}
+.device-badge.connected .name{color:var(--green)}
+.display-3{
+  font-family:var(--font-ui);font-size:22px;font-weight:500;letter-spacing:.18em;
+  color:var(--amber);background:#090907;border:1px solid #2a2800;border-radius:4px;
+  padding:4px 10px;text-align:center;text-shadow:0 0 10px #f0a030aa;min-width:72px;
+}
+.hactions{display:flex;gap:6px;margin-left:auto}
+.dirty-banner{
+  display:none;background:var(--amber);color:#000;font-size:11px;font-weight:700;
+  padding:3px 10px;border-radius:var(--radius);letter-spacing:.06em;
+  animation:pulse 1.2s infinite;
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* ── Main ── */
+.main{grid-area:main;display:grid;grid-template-columns:240px 1fr;overflow:hidden;height:calc(100vh - 50px - 34px)}
+
+/* ── Sidebar ── */
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column}
+.section{border-bottom:1px solid var(--border);padding:12px 14px}
+.section-title{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+
+/* ── Controls ── */
+.port-row{display:flex;flex-direction:column;gap:5px;margin-bottom:7px}
+.port-label{font-size:11px;color:var(--text2)}
+.port-select{
+  width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);
+  font-family:var(--font-ui);font-size:11px;padding:4px 7px;border-radius:var(--radius);
+  appearance:none;cursor:pointer;
+}
+.port-select:focus{outline:none;border-color:var(--accent)}
+.port-select option{background:var(--bg3)}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  border:1px solid var(--border2);background:var(--bg3);color:var(--text);
+  font-family:var(--font-label);font-size:11px;font-weight:500;
+  padding:5px 10px;border-radius:var(--radius);cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.btn:hover{border-color:var(--accent);color:var(--accent2)}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent2);border-color:var(--accent2)}
+.btn.sm{font-size:10px;padding:4px 8px}
+.btn.full{width:100%}
+.btn:disabled{opacity:.35;cursor:not-allowed;pointer-events:none}
+.btn-row{display:flex;gap:6px;flex-wrap:wrap}
+
+/* ── Status cells ── */
+.status-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.sc{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px}
+.sc .slabel{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em}
+.sc .sval{font-family:var(--font-ui);font-size:13px;color:var(--accent2);margin-top:1px}
+
+/* ── Log ── */
+.log-area{flex:1;display:flex;flex-direction:column;min-height:120px;max-height:220px}
+.log-hdr{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--border);background:var(--bg2);border-top:1px solid var(--border)}
+.log-title{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)}
+.log-scroll{flex:1;overflow-y:auto;font-family:var(--font-ui);font-size:10px;padding:5px 10px}
+.log-line{padding:1px 0;display:flex;gap:6px;border-bottom:1px solid var(--border)}
+.log-line .ts{color:var(--text3);flex-shrink:0}
+.log-line .dir{flex-shrink:0}
+.log-line .dir.in{color:var(--blue)}
+.log-line .dir.out{color:var(--amber)}
+.log-line .msg{color:var(--text2);word-break:break-all}
+.log-line.sx .msg{color:var(--green)}
+.log-line.er .msg{color:var(--led-red)}
+.log-line.info .msg{color:var(--text)}
+
+/* ── Panel area ── */
+.panel-area{overflow:hidden;padding:0;display:flex;flex-direction:column;background:var(--bg);}
+
+/* ── Tabs ── */
+.tab-bar{
+  display:flex;align-items:center;gap:0;
+  background:var(--bg2);border-bottom:2px solid var(--border);
+  padding:0 16px;flex-shrink:0;
+  flex-wrap:wrap;
+}
+.tab{
+  padding:10px 14px;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;
+  transition:all .15s;white-space:nowrap;
+}
+.tab:hover{color:var(--text2)}
+.tab.active{color:var(--accent2);border-bottom-color:var(--accent2)}
+.tab-content{display:none;flex:1;min-height:0;overflow-y:auto;}
+.tab-content.active{display:flex;flex-direction:column;min-height:0;overflow-y:auto;}
+
+/* ── Panel sections (built by JS) ── */
+.panel-section{
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  display:flex;flex-direction:column;
+}
+
+/* ── Keyboard focus ── */
+:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+
+/* ── Preset cards: the parts of one preset as cards on a single scrollable screen ── */
+.cards{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,560px),1fr));
+  gap:12px;padding:12px;align-content:start;
+  grid-auto-rows:max-content; /* else tracks shrink to the container height (cards are overflow:hidden) */
+}
+.cards-hint{grid-column:1/-1;font-size:9px;color:var(--text3)}
+.card{
+  display:flex;flex-direction:column;min-width:0;overflow:hidden;
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);
+}
+.card.wide{grid-column:1/-1}
+.card-title{
+  display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;user-select:none;
+  font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text2);background:var(--bg3);border-bottom:1px solid var(--border);
+}
+.card-title::after{content:'▾';margin-left:auto;color:var(--text3)}
+.card.collapsed .card-title{border-bottom:none}
+.card.collapsed .card-title::after{content:'▸'}
+.card-body{display:flex;flex-direction:column;min-height:0}
+.card.collapsed .card-body{display:none !important}
+#card-seq{height:340px !important;overflow:hidden !important}
+
+/* ── Narrow screens: stack the sidebar below the editor and let the page scroll ── */
+@media (max-width:820px){
+  .header{height:auto;flex-wrap:wrap;padding:6px 12px;gap:8px}
+  .hactions{margin-left:0;flex-wrap:wrap}
+  .device-badge{min-width:0}
+  .main{grid-template-columns:minmax(0,1fr);height:auto;overflow:visible}
+  .sidebar{border-right:none;border-top:1px solid var(--border);overflow:visible}
+  .panel-area{overflow:visible;order:-1} /* editor first, device controls below */
+  #editorWrap{overflow:visible !important}
+  .tab-bar{flex-wrap:nowrap;overflow-x:auto;padding:0 8px}
+  .tab-content{overflow:visible !important}
+  #tab-library{height:70vh !important;overflow:hidden !important}
+}
+
+/* ── Details mode toggle ── */
+.tog-input{display:none}
+.tog-track{
+  position:relative;width:32px;height:16px;border-radius:8px;
+  background:var(--border2);transition:background .2s;flex-shrink:0;
+}
+.tog-input:checked ~ .tog-track{background:var(--accent)}
+.tog-thumb{
+  position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;
+  background:var(--text3);transition:left .2s,background .2s;
+}
+.tog-input:checked ~ .tog-track .tog-thumb{left:18px;background:#fff}
+
+/* ── Preset number input ── */
+.num-input{
+  width:60px;background:var(--bg3);border:1px solid var(--border);color:var(--text);
+  font-family:var(--font-ui);font-size:12px;padding:4px 7px;border-radius:var(--radius);
+}
+.num-input:focus{outline:none;border-color:var(--accent)}
+
+/* ── Welcome ── */
+.welcome{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px;padding:40px;color:var(--text3)}
+.welcome .icon{font-size:44px;opacity:.25}
+.welcome h2{font-size:17px;color:var(--text2);font-weight:600}
+.welcome p{font-size:12px;max-width:300px;line-height:1.6}
+.welcome code{background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-family:var(--font-ui);font-size:10px;color:var(--accent2)}
+
+/* ── Footer ── */
+.footer{
+  grid-area:footer;background:var(--bg2);border-top:1px solid var(--border);
+  height:34px;display:flex;align-items:center;padding:0 14px;gap:10px;
+}
+.fi{font-size:10px;color:var(--text3);display:flex;align-items:center;gap:4px}
+.fi .dot{width:5px;height:5px;border-radius:50%;background:var(--text3)}
+.fi.active .dot{background:var(--led-green);box-shadow:0 0 4px var(--led-green)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.fade-in{animation:fadeIn .2s ease}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo">
+    <svg viewBox="0 0 26 26" fill="none">
+      <rect width="26" height="26" rx="5" fill="#e8502a18"/>
+      <path d="M5 21L5 9L9 5L21 5L21 17L17 21Z" stroke="#e8502a" stroke-width="1.5" fill="none"/>
+      <rect x="9" y="9" width="8" height="8" fill="#e8502a33" rx="1"/>
+      <circle cx="13" cy="13" r="2" fill="#ff7a52"/>
+    </svg>
+    ADRENALINN III
+  </div>
+  <div class="hdiv"></div>
+  <div class="device-badge" id="deviceBadge">
+    <div class="led"></div>
+    <span class="name" id="deviceName">No device connected</span>
+  </div>
+  <div class="display-3" id="display3">---</div>
+  <span id="abBadge" style="display:none;font-family:var(--font-ui);font-size:11px;font-weight:700;color:var(--blue);background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:3px 8px;">A</span>
+  <div class="dirty-banner" id="dirtyBanner">● UNSAVED</div>
+  <div class="hactions">
+    <button class="btn sm" id="btnRefreshPorts">↺</button>
+    <button class="btn sm primary" id="btnAutoDetect">⚡ Auto-detect</button>
+    <button class="btn sm" id="btnReqPreset" disabled>⬇ Pull Preset</button>
+    <button class="btn sm" id="btnSendPreset" disabled>⬆ Push Preset</button>
+    <button class="btn sm" id="btnSaveSlot" disabled title="Save to a specific slot (writes flash)">💾 Save Slot</button>
+    <button class="btn sm" id="btnRevert" disabled>↩ Revert</button>
+    <button class="btn sm" id="btnUndo" disabled title="Undo (Ctrl+Z)">↶</button>
+    <button class="btn sm" id="btnRedo" disabled title="Redo (Ctrl+Y)">↷</button>
+    <button class="btn sm" id="btnCopyB" disabled title="Copy current preset into comparison buffer B">📋→B</button>
+    <button class="btn sm" id="btnSwapAB" disabled title="Toggle between preset A and buffer B">⇄ A/B</button>
+    <button class="btn sm" id="btnSysex" title="Show the SysEx bytes of the preset / drumbeat in the editor (copy or download .syx)">&lt;/&gt; SysEx</button>
+    <button class="btn sm" id="btnTheme" title="Toggle dark / light mode">🌙</button>
+  </div>
+</header>
+
+<!-- Save to Slot dialog -->
+<div id="saveSlotDialog" style="display:none;position:fixed;inset:0;background:#0008;z-index:200;align-items:center;justify-content:center;">
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:24px;width:320px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px #000a;">
+    <div style="font-size:13px;font-weight:700;color:var(--text)">Save preset to slot</div>
+    <div style="font-size:11px;color:var(--text3);line-height:1.6">
+      Writes the preset to the device's flash memory.<br>
+      The device takes ~1 second to save.<br>
+      <strong style="color:var(--amber)">⚠ Overwrites the selected slot.</strong>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:11px;color:var(--text2)">Slot (0–199):</span>
+      <input type="number" id="saveSlotNum" min="0" max="199" value="0"
+        style="width:70px;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--font-ui);font-size:13px;padding:5px 8px;border-radius:var(--r);text-align:center;">
+      <span style="font-size:10px;color:var(--text3);font-family:var(--font-ui)" id="saveSlotPreview"></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:11px;color:var(--text2)">Name:</span>
+      <input type="text" id="saveSlotName" maxlength="40" placeholder="(optional)"
+        style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--font-label);font-size:12px;padding:5px 8px;border-radius:var(--r);">
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn sm" id="btnSaveSlotCancel">Cancel</button>
+      <button class="btn sm primary" id="btnSaveSlotConfirm">💾 Save</button>
+    </div>
+    <div id="saveSlotStatus" style="display:none;font-size:11px;font-family:var(--font-ui);color:var(--green);text-align:center;padding:6px;border-radius:4px;background:var(--bg3)">
+      ⏳ Saving…
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="section">
+      <div class="section-title">MIDI Ports</div>
+      <div class="port-row">
+        <span class="port-label">Input</span>
+        <select class="port-select" id="selectInput"><option value="">— select input —</option></select>
+      </div>
+      <div class="port-row">
+        <span class="port-label">Output</span>
+        <select class="port-select" id="selectOutput"><option value="">— select output —</option></select>
+      </div>
+      <div class="btn-row" style="margin-top:6px">
+        <button class="btn sm full" id="btnConnect">Connect</button>
+        <button class="btn sm" id="btnDisconnect">✕</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Select</div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+        <span style="font-size:10px;color:var(--text2);width:54px;flex-shrink:0">Preset</span>
+        <input type="number" class="num-input" id="presetNum" min="0" max="199" value="0">
+        <button class="btn sm" id="btnSelectPreset" disabled>Go</button>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+        <span style="font-size:10px;color:var(--amber);width:54px;flex-shrink:0">Drumbeat</span>
+        <input type="number" class="num-input" id="dbNum" min="0" max="199" value="0">
+        <button class="btn sm" id="btnSelectDb" disabled>Go</button>
+      </div>
+      <button class="btn sm full" id="btnReqSystem" disabled style="margin-bottom:6px">⬇ System Params</button>
+      <button class="btn sm full" id="btnIdentity" disabled style="margin-bottom:6px">🔍 Identity</button>
+      <button class="btn sm full" id="btnTransport" disabled title="Send MIDI Start/Stop to the device (Space)">▶ Start</button>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Device Status</div>
+      <div class="status-grid">
+        <div class="sc"><div class="slabel">Preset</div><div class="sval" id="stPreset">---</div></div>
+        <div class="sc"><div class="slabel">Drumbeat</div><div class="sval" id="stDrumbeat">---</div></div>
+        <div class="sc"><div class="slabel">Tempo</div><div class="sval" id="stTempo">---</div></div>
+        <div class="sc"><div class="slabel">FW</div><div class="sval" id="stFw">---</div></div>
+      </div>
+    </div>
+
+    <!-- LOG -->
+    <div class="log-area">
+      <div class="log-hdr">
+        <span class="log-title">MIDI Log</span>
+        <button class="btn sm" id="btnClearLog" style="margin-left:auto">Clr</button>
+      </div>
+      <div class="log-scroll" id="logScroll"></div>
+    </div>
+
+  </aside>
+
+  <!-- PANEL AREA -->
+  <section class="panel-area" id="panelArea">
+
+    <!-- Welcome (shown until connected) -->
+    <div class="welcome" id="welcomeMsg">
+      <div class="icon">🎸</div>
+      <h2>AdrenaLinn III Web Editor</h2>
+      <p>Connect your device via USB-MIDI or click <strong>Auto-detect</strong>.</p>
+      <p>Requires Chrome or Edge with <code>Web MIDI API</code>.</p>
+      <p style="margin-top:8px;color:var(--text2)">
+        You can also use the editor offline — pull a preset from the device or edit the default values.
+      </p>
+      <button class="btn primary" id="btnOfflineEdit" style="margin-top:12px">✏ Edit Offline (Default Preset)</button>
+    </div>
+
+    <!-- Preset Editor (shown after load) -->
+    <div id="editorWrap" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
+
+      <!-- Tabs -->
+      <div class="tab-bar" id="tabBar">
+        <div class="tab" data-tab="preset">PRESET</div>
+        <div class="tab" data-tab="drumbeat">🥁 DRUMBEAT</div>
+        <div class="tab" data-tab="library">📚 LIBRARY</div>
+        <div class="tab" data-tab="system">⚙ SYSTEM</div>
+      </div>
+
+      <!-- Tab contents — all start hidden; activateTab() shows one at a time -->
+      <div class="tab-content" id="tab-preset" style="display:none;">
+        <div class="cards">
+          <div class="cards-hint">Italic labels are the pedal's “Details” settings.</div>
+          <div class="card" data-card="modfx"><div class="card-title">MOD FX</div><div class="card-body" id="card-modfx"></div></div>
+          <div class="card" data-card="amp"><div class="card-title">AMP</div><div class="card-body" id="card-amp"></div></div>
+          <div class="card" data-card="delay"><div class="card-title">DELAY / REVERB</div><div class="card-body" id="card-delay"></div></div>
+          <div class="card" data-card="meta"><div class="card-title">PRESET</div><div class="card-body" id="card-meta"></div></div>
+          <div class="card" data-card="pedals"><div class="card-title">EXPRESSION PEDALS</div><div class="card-body" id="card-pedals"></div></div>
+          <div class="card wide" data-card="seq"><div class="card-title">SEQUENCE</div><div class="card-body" id="card-seq"></div></div>
+        </div>
+      </div>
+      <div class="tab-content" id="tab-drumbeat" style="display:none;"></div>
+      <div class="tab-content" id="tab-library"  style="display:none;"></div>
+      <div class="tab-content" id="tab-system"   style="display:none;"></div>
+
+    </div>
+
+  </section>
+</main>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="fi" id="footMidi"><div class="dot"></div>WebMIDI</div>
+  <div class="fi" id="footSysEx"><div class="dot"></div>SysEx</div>
+  <div class="fi" id="footClock"><div class="dot"></div>Clock</div>
+  <div class="fi active" style="margin-left:8px">
+    <div class="dot" style="background:var(--blue)"></div>
+    <span>Library: <span id="libBadge" style="color:var(--blue);font-family:var(--font-ui)">0P / 0D</span></span>
+  </div>
+  <span style="margin-left:auto;font-size:10px;color:var(--text3)">AdrenaLinn III Web Editor</span>
+</footer>
+
+</div><!-- /app -->
+
+<script type="module">
+import { midi }        from './src/midi/midiManager.js';
+import {
+  buildIdentityRequest, buildRequestPresetEditBuf,
+  buildSelectPreset, buildSelectDrumbeat
+} from './src/midi/sysex.js';
+import { presetStore }   from './src/store/presetStore.js';
+import { drumbeatStore } from './src/store/drumbeatStore.js';
+import { libraryStore }  from './src/store/libraryStore.js';
+import { ModFxPanel }        from './src/components/ModFxPanel.js';
+import { AmpPanel }          from './src/components/AmpPanel.js';
+import { DelayReverbPanel }  from './src/components/DelayReverbPanel.js';
+import { DrumbeatPanel }     from './src/components/DrumbeatPanel.js';
+import { PresetBrowser }     from './src/components/PresetBrowser.js';
+import { SequenceEditor }    from './src/components/SequenceEditor.js';
+import { PedalAssignPanel }  from './src/components/PedalAssignPanel.js';
+import { SystemPanel }       from './src/components/SystemPanel.js';
+import { PresetMetaPanel }   from './src/components/PresetMetaPanel.js';
+import { systemStore }       from './src/store/systemStore.js';
+
+// ── DOM refs ──────────────────────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const selIn    = $('selectInput');
+const selOut   = $('selectOutput');
+const badge    = $('deviceBadge');
+const devName  = $('deviceName');
+const display3 = $('display3');
+const logDiv   = $('logScroll');
+const dirtyBanner = $('dirtyBanner');
+
+// ── Dark / Light theme ───────────────────────────────────────────────────────
+const THEME_KEY = 'al3-theme';
+function applyTheme(theme) {
+  if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  else document.documentElement.removeAttribute('data-theme');
+  $('btnTheme').textContent = theme === 'light' ? '☀️' : '🌙';
+  try { localStorage.setItem(THEME_KEY, theme); } catch(e) {}
+}
+$('btnTheme').onclick = () => {
+  applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
+};
+applyTheme(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
+
+// panel containers (the preset parts live in cards inside the PRESET tab)
+const tabModfx    = $('card-modfx');
+const tabAmp      = $('card-amp');
+const tabDelay    = $('card-delay');
+const tabMeta     = $('card-meta');
+const tabPedals   = $('card-pedals');
+const tabSeq      = $('card-seq');
+const tabDrumbeat = $('tab-drumbeat');
+const tabLibrary  = $('tab-library');
+const tabSystem   = $('tab-system');
+
+// panels
+let seqEditor = null, drumbeatPanel = null, presetBrowser = null;
+
+// ── Log ───────────────────────────────────────────────────────────────────
+let lc = 0;
+function log(dir, msg, cls='') {
+  if (lc > 400) { logDiv.innerHTML=''; lc=0; }
+  const ts = new Date().toTimeString().slice(0,8);
+  const d  = document.createElement('div');
+  d.className = `log-line ${cls}`;
+  d.innerHTML = `<span class="ts">${ts}</span><span class="dir ${dir}">${dir}</span><span class="msg">${msg}</span>`;
+  logDiv.appendChild(d);
+  lc++;
+  logDiv.scrollTop = logDiv.scrollHeight;
+}
+const logI = m    => log('--', m, 'info');
+const logIn = m   => log('in', m, 'sx');
+const logOut = m  => log('out', m, 'sx');
+const logErr = m  => log('!!', m, 'er');
+
+$('btnClearLog').onclick = () => { logDiv.innerHTML=''; lc=0; };
+
+// ── Footer ─────────────────────────────────────────────────────────────────
+const setFoot = (id, on) => {
+  const el = $(id);
+  on ? el.classList.add('active') : el.classList.remove('active');
+};
+
+// ── Ports ──────────────────────────────────────────────────────────────────
+function populatePorts() {
+  const ins  = midi.getInputs();
+  const outs = midi.getOutputs();
+  const pIn  = selIn.value, pOut = selOut.value;
+
+  selIn.innerHTML  = '<option value="">— input —</option>';
+  selOut.innerHTML = '<option value="">— output —</option>';
+  ins.forEach( p => selIn.appendChild(new Option(p.name, p.id)));
+  outs.forEach(p => selOut.appendChild(new Option(p.name, p.id)));
+
+  if (pIn)  selIn.value  = pIn;
+  if (pOut) selOut.value = pOut;
+  const summary = `Ports: ${ins.length} in / ${outs.length} out`;
+  if (summary !== populatePorts._last) logI(summary); // opening a port fires several state changes — don't repeat the line
+  populatePorts._last = summary;
+}
+
+// ── Connection UI ──────────────────────────────────────────────────────────
+function setConnected(on, name='') {
+  if (on) {
+    showEditor(); // a connected device is always editable, whether or not its preset has been read yet
+    badge.classList.add('connected'); badge.classList.remove('error');
+    devName.textContent = name || 'Connected';
+    ['btnReqPreset','btnSendPreset','btnRevert','btnReqSystem','btnIdentity','btnSelectPreset','btnSelectDb','btnSaveSlot','btnTransport']
+      .forEach(id => $(id) && ($(id).disabled = false));
+  } else {
+    badge.classList.remove('connected');
+    devName.textContent = 'No device connected';
+    ['btnReqPreset','btnSendPreset','btnRevert','btnReqSystem','btnIdentity','btnSelectPreset','btnSelectDb','btnSaveSlot','btnTransport']
+      .forEach(id => $(id) && ($(id).disabled = true));
+  }
+}
+
+// ── Show editor ────────────────────────────────────────────────────────────
+let _initialTabShown = false; // the first tab shown when the editor opens (PRESET); later calls leave the user's tab alone
+let _syncing = false;         // true while syncFromDevice() runs — its reads must not switch tabs
+
+function showEditor() {
+  $('welcomeMsg').style.display = 'none';
+  const wrap = $('editorWrap');
+  wrap.style.display       = 'flex';
+  wrap.style.flexDirection = 'column';
+  wrap.style.overflow      = 'hidden';
+  wrap.style.flex          = '1';
+  wrap.style.minHeight     = '0';
+
+  if (!_initialTabShown) {
+    _initialTabShown = true;
+    activateTab('preset');
+  }
+
+  $('btnCopyB').disabled = false;
+}
+
+// ── Tab system — lazy mount + explicit show/hide ───────────────────────────
+// Four tabs: PRESET (every part of the preset as cards), DRUMBEAT, LIBRARY, SYSTEM.
+// A tab's panels are created the first time it is shown. Only the active tab-content
+// gets display:flex; all others get display:none.
+
+const PANELS = {}; // panel name → instance (created on first activation)
+
+let _currentTab = 'preset';
+
+function activateTab(tabId) {
+  _currentTab = tabId;
+  document.querySelectorAll('.tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.tab === tabId);
+    t.setAttribute('aria-selected', String(t.dataset.tab === tabId));
+  });
+
+  // Show/hide tab content divs explicitly (don't rely on CSS class alone)
+  document.querySelectorAll('.tab-content').forEach(el => {
+    if (el.id === 'tab-' + tabId) {
+      el.style.display      = 'flex';
+      el.style.flexDirection= 'column';
+      el.style.flex         = '1';
+      el.style.minHeight    = '0';
+      el.style.overflow     = tabId === 'library' ? 'hidden' : 'auto';
+    } else {
+      el.style.display = 'none';
+    }
+  });
+
+  // Lazy-create the panels for this tab if not yet done
+  _mountPanel(tabId);
+}
+
+function _mountPanel(tabId) {
+  switch(tabId) {
+    case 'preset':
+      PANELS.modfx  ??= new ModFxPanel(tabModfx);
+      PANELS.amp    ??= new AmpPanel(tabAmp);
+      PANELS.delay  ??= new DelayReverbPanel(tabDelay);
+      PANELS.meta   ??= new PresetMetaPanel(tabMeta);
+      PANELS.pedals ??= new PedalAssignPanel(tabPedals);
+      if (!PANELS.seq) { PANELS.seq = new SequenceEditor(tabSeq); seqEditor = PANELS.seq; }
+      break;
+    case 'drumbeat':
+      if (!PANELS.drumbeat) { PANELS.drumbeat = new DrumbeatPanel(tabDrumbeat); drumbeatPanel = PANELS.drumbeat; }
+      break;
+    case 'library':
+      if (!PANELS.library) { PANELS.library = new PresetBrowser(tabLibrary, 'preset'); presetBrowser = PANELS.library; }
+      break;
+    case 'system':
+      PANELS.system ??= new SystemPanel(tabSystem);
+      break;
+  }
+}
+
+// Expose for use by panel components (e.g. PresetBrowser)
+window._activateTab = activateTab;
+
+// Wire tab clicks and card titles (click a title to collapse/expand its card)
+$('tabBar').setAttribute('role', 'tablist');
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.setAttribute('role', 'tab');
+  tab.tabIndex = 0;
+  tab.onclick = () => activateTab(tab.dataset.tab);
+  tab.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activateTab(tab.dataset.tab); }
+  });
+});
+document.querySelectorAll('.card-title').forEach(t => {
+  const toggle = () => {
+    const collapsed = t.parentElement.classList.toggle('collapsed');
+    t.setAttribute('aria-expanded', String(!collapsed));
+  };
+  t.setAttribute('role', 'button');
+  t.setAttribute('aria-expanded', 'true');
+  t.tabIndex = 0;
+  t.onclick = toggle;
+  t.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+  });
+});
+
+// ── Dirty tracking UI ──────────────────────────────────────────────────────
+presetStore.on('dirty', ({ dirty }) => {
+  dirtyBanner.style.display = dirty ? '' : 'none';
+  $('btnRevert').disabled = !dirty;
+});
+
+// ── Undo / Redo ──────────────────────────────────────────────────────────
+presetStore.on('historyChange', ({ canUndo, canRedo }) => {
+  $('btnUndo').disabled = !canUndo;
+  $('btnRedo').disabled = !canRedo;
+});
+$('btnUndo').onclick = () => { if (presetStore.undo()) logI('Undo'); };
+$('btnRedo').onclick = () => { if (presetStore.redo()) logI('Redo'); };
+
+// ── MIDI transport (Start/Stop) ─────────────────────────────────────────────
+let _transportPlaying = false;
+function toggleTransport() {
+  if (!midi.connected) { logErr('Connect the device first'); return; }
+  if (_transportPlaying) {
+    midi.send(new Uint8Array([0xFC])); // Stop
+    logOut('⏹ Sent MIDI Stop');
+  } else {
+    midi.send(new Uint8Array([0xFA])); // Start
+    logOut('▶ Sent MIDI Start');
+  }
+  _transportPlaying = !_transportPlaying;
+  $('btnTransport').textContent = _transportPlaying ? '⏹ Stop' : '▶ Start';
+}
+$('btnTransport').onclick = () => toggleTransport();
+
+// ── Tab cycling (Tab key, only when no control is focused) ─────────────────
+// ── Global keyboard shortcuts ────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  const tag    = document.activeElement?.tagName;
+  const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+  if (e.ctrlKey || e.metaKey) {
+    if (typing) return;
+    if (e.key === 'z' || e.key === 'Z') {
+      e.preventDefault();
+      if (e.shiftKey) { if (presetStore.redo()) logI('Redo'); }
+      else            { if (presetStore.undo()) logI('Undo'); }
+    } else if (e.key === 'y' || e.key === 'Y') {
+      e.preventDefault();
+      if (presetStore.redo()) logI('Redo');
+    } else if (e.key === 's' || e.key === 'S') {
+      e.preventDefault();
+      const btn = $('btnSendPreset');
+      if (btn && !btn.disabled) btn.click();
+    }
+    return;
+  }
+
+  if (e.key === ' ' || e.code === 'Space') {
+    // Let Space activate a focused button/checkbox/tab/card title as usual
+    if (typing || tag === 'BUTTON' || document.activeElement?.closest('.tab, .card-title')) return;
+    e.preventDefault();
+    toggleTransport();
+    return;
+  }
+
+  // Tablist keyboard support: with a tab focused, arrows/Home/End move between tabs.
+  // (Tab itself is never intercepted, so every control stays reachable by keyboard.)
+  if (document.activeElement?.classList.contains('tab')) {
+    const tabs = [...document.querySelectorAll('.tab')];
+    const i = tabs.indexOf(document.activeElement);
+    const go = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+    if (go !== undefined) {
+      e.preventDefault();
+      const t = tabs[(go + tabs.length) % tabs.length];
+      activateTab(t.dataset.tab);
+      t.focus();
+    }
+  }
+});
+
+// ── A/B comparison ─────────────────────────────────────────────────────────
+const abBadge = $('abBadge');
+presetStore.on('sideChange', ({ side, hasB }) => {
+  $('btnSwapAB').disabled = !hasB;
+  abBadge.style.display = hasB ? '' : 'none';
+  abBadge.textContent = side;
+  abBadge.style.color = side === 'A' ? 'var(--blue)' : 'var(--accent2)';
+});
+$('btnCopyB').onclick = () => {
+  presetStore.copyToB();
+  logI('Preset copied to buffer B');
+};
+$('btnSwapAB').onclick = () => {
+  if (presetStore.swapAB()) logI(`Switched to side ${presetStore.activeSide}`);
+};
+
+presetStore.on('slot', ({ number }) => {
+  display3.textContent = String(number).padStart(3,'0');
+  $('presetNum').value = number;
+});
+drumbeatStore.on('slot', ({ number }) => { $('dbNum').value = number; });
+
+presetStore.on('load', () => {
+  display3.textContent = presetStore.number !== null
+    ? String(presetStore.number).padStart(3,'0')
+    : 'EDT';
+});
+
+// ── Button actions ─────────────────────────────────────────────────────────
+$('btnRefreshPorts').onclick = () => populatePorts();
+
+// ── Identity + auto-connect ────────────────────────────────────────────────
+let _userDisconnected = false; // set by the Disconnect button; stops hot-plug auto-connect until the user connects again
+let _autoConnectBusy  = false;
+
+function requestIdentity() {
+  if (!midi.connected) return;
+  midi.send(buildIdentityRequest());
+  logOut('Identity Request');
+}
+
+// Resolves with the event detail when `type` arrives within `ms`, else null
+function waitMidi(type, ms) {
+  return new Promise(resolve => {
+    const off = midi.on(type, d => { clearTimeout(timer); off(); resolve(d); });
+    const timer = setTimeout(() => { off(); resolve(null); }, ms);
+  });
+}
+
+// Once per connection (triggered by the first Identity Reply): read the System
+// parameters and the device's current preset + drumbeat so the editor opens on
+// what the pedal is actually doing. Requests are sequential so replies can't
+// interleave. Unsaved offline edits are never overwritten.
+let _synced = false;
+async function syncFromDevice() {
+  _syncing = true;
+  try { await _syncFromDevice(); } finally { _syncing = false; }
+}
+async function _syncFromDevice() {
+  logI('Reading system parameters and current preset…');
+  const sys = waitMidi('sysex:system', 1500);
+  systemStore.request();
+  const sysData = await sys;
+  const active = sysData?.raw ?? [];
+
+  if (presetStore.dirty || drumbeatStore.dirty) {
+    logI('Unsaved edits kept — use Pull to load the device preset');
+    return;
+  }
+  const pe = waitMidi('sysex:presetEditBuf', 1500);
+  presetStore.requestEditBuffer();
+  if (await pe && active[0] !== undefined) presetStore.adoptSlotNumber(active[0]);
+
+  const de = waitMidi('sysex:drumbeatEditBuf', 1500);
+  drumbeatStore.requestEditBuffer();
+  if (await de && active[1] !== undefined) drumbeatStore.adoptSlotNumber(active[1]);
+}
+
+// With exactly one MIDI input and one output there is nothing to choose: connect
+// and ask for the Identity. The connection is kept only if an AdrenaLinn III
+// answers; otherwise it is dropped so SysEx is never sent on to an unknown device.
+// Software ports that every machine has and that can't be the pedal (macOS IAC Driver,
+// Linux "Midi Through", Windows GS Wavetable Synth, network sessions) don't count
+// when deciding whether there is exactly one device.
+const isVirtualPort = p => /\b(IAC|Midi Through|GS Wavetable|Network Session|Virtual)\b/i.test(`${p.name} ${p.manufacturer ?? ''}`);
+
+async function tryAutoConnect() {
+  if (midi.connected || _autoConnectBusy || _userDisconnected) return;
+  const ins = midi.getInputs().filter(p => !isVirtualPort(p));
+  const outs = midi.getOutputs().filter(p => !isVirtualPort(p));
+  if (ins.length !== 1 || outs.length !== 1) return;
+  _autoConnectBusy = true;
+  try {
+    selIn.value = ins[0].id; selOut.value = outs[0].id;
+    logI(`Single MIDI device found (${ins[0].name}) — connecting…`);
+    if (!midi.connect(ins[0].id, outs[0].id)) { logErr('Auto-connect failed'); return; }
+    const reply = waitMidi('sysex:identity', 2000);
+    requestIdentity();
+    if (!(await reply)) {
+      midi.disconnect();
+      logErr(`No Identity reply from ${ins[0].name} — not an AdrenaLinn III? Connect manually if it is.`);
+    }
+  } finally { _autoConnectBusy = false; }
+}
+
+$('btnConnect').onclick = () => {
+  _userDisconnected = false;
+  const ok = midi.connect(selIn.value, selOut.value);
+  if (ok) { setConnected(true, selIn.options[selIn.selectedIndex]?.text); requestIdentity(); }
+  else { logErr('Connection failed'); badge.classList.add('error'); }
+};
+midi.on('connectionChange', ({ connected }) => { if (!connected) _synced = false; });
+
+// Cable unplugged / replugged (explicit Disconnect handles itself below)
+midi.on('connectionChange', ({ connected, reason }) => {
+  if (connected || reason !== 'lost') return;
+  setConnected(false);
+  logErr('Device disconnected');
+  _transportPlaying = false; $('btnTransport').textContent = '▶ Start';
+});
+midi.on('reconnected', () => {
+  setConnected(true, midi.deviceName || 'Connected');
+  logIn('Device reconnected');
+  requestIdentity();
+});
+
+$('btnDisconnect').onclick = () => {
+  _userDisconnected = true;
+  midi.disconnect(); setConnected(false); logI('Disconnected');
+  _transportPlaying = false; $('btnTransport').textContent = '▶ Start';
+};
+
+$('btnAutoDetect').onclick = async () => {
+  const btn = $('btnAutoDetect');
+  _userDisconnected = false;
+  btn.disabled = true; btn.textContent = '⏳ Scanning…';
+  logI('Auto-detecting AdrenaLinn III…');
+  try {
+    const r = await midi.autoDetect(3000);
+    if (r) {
+      selIn.value = r.inputId; selOut.value = r.outputId;
+      setConnected(true, r.name);
+      requestIdentity(); // the probe consumed its own reply — ask again to trigger the initial sync
+    } else {
+      logErr('Device not found — check USB and try manual selection');
+      badge.classList.add('error');
+    }
+  } catch(e) { logErr(e.message); }
+  finally { btn.disabled=false; btn.textContent='⚡ Auto-detect'; }
+};
+
+$('btnIdentity').onclick = () => {
+  midi.send(buildIdentityRequest());
+  logOut('Identity Request');
+};
+
+$('btnReqPreset').onclick = () => {
+  midi.send(buildRequestPresetEditBuf());
+  logOut('Request Preset Edit Buffer');
+};
+
+$('btnSendPreset').onclick = () => {
+  presetStore.sendToDevice();
+  logOut('Pushed preset edit buffer to device');
+};
+
+$('btnRevert').onclick = () => {
+  presetStore.revert();
+  logI('Reverted to original');
+};
+
+// ── Save to Slot dialog ────────────────────────────────────────────────────
+const saveDialog   = $('saveSlotDialog');
+const saveSlotNum  = $('saveSlotNum');
+const saveSlotName = $('saveSlotName');
+const saveStatus   = $('saveSlotStatus');
+
+// Preview: show what's currently in that slot (from library cache) + its name
+saveSlotNum.addEventListener('input', () => {
+  const n   = parseInt(saveSlotNum.value);
+  const prev= $('saveSlotPreview');
+  if (isNaN(n)||n<0||n>199) { prev.textContent=''; return; }
+  const rec = libraryStore.getPreset(n);
+  prev.textContent = rec ? '(slot occupied)' : '(slot empty)';
+  prev.style.color = rec ? 'var(--amber)' : 'var(--text3)';
+  saveSlotName.value = libraryStore.getPresetName(n);
+});
+
+let sysexDialog = null;
+// Also used by the famous-presets list (with a fixed source)
+window._openSysexDialog = async source => {
+  sysexDialog ??= new (await import('./src/components/SysexDialog.js')).SysexDialog();
+  sysexDialog.open(source);
+};
+$('btnSysex').onclick = () => window._openSysexDialog();
+
+$('btnSaveSlot').onclick = () => {
+  // Pre-fill slot with current preset number if known
+  if (presetStore.number !== null) saveSlotNum.value = presetStore.number;
+  saveSlotNum.dispatchEvent(new Event('input'));
+  saveStatus.style.display = 'none';
+  saveDialog.style.display = 'flex';
+};
+
+$('btnSaveSlotCancel').onclick = () => {
+  saveDialog.style.display = 'none';
+};
+
+// Close on backdrop click
+saveDialog.addEventListener('click', e => {
+  if (e.target === saveDialog) saveDialog.style.display = 'none';
+});
+
+$('btnSaveSlotConfirm').onclick = async () => {
+  const slot = parseInt(saveSlotNum.value);
+  if (isNaN(slot)||slot<0||slot>199) { logErr('Invalid slot (0-199)'); return; }
+
+  const confirmBtn = $('btnSaveSlotConfirm');
+  confirmBtn.disabled = true;
+  saveStatus.style.display = '';
+  saveStatus.style.color   = 'var(--amber)';
+  saveStatus.textContent   = '⏳ Saving…';
+
+  try {
+    await presetStore.saveToSlot(slot);
+    if (saveSlotName.value.trim()) {
+      await libraryStore.setPresetName(slot, saveSlotName.value);
+    }
+    saveStatus.style.color   = 'var(--green)';
+    saveStatus.textContent   = `✓ Saved to slot ${String(slot).padStart(3,'0')}`;
+    logOut(`💾 Preset saved → slot ${slot}`);
+    display3.textContent = String(slot).padStart(3,'0');
+    setTimeout(() => { saveDialog.style.display = 'none'; }, 1400);
+  } catch(e) {
+    saveStatus.style.color   = '#ff5555';
+    saveStatus.textContent   = '✗ ' + e.message;
+    logErr('Save failed: ' + e.message);
+  } finally {
+    confirmBtn.disabled = false;
+  }
+};
+
+// Wire saveComplete to also update library cache
+presetStore.on('saved', async ({ slot }) => {
+  try {
+    const { serializePreset } = await import('./src/midi/presetData.js');
+    const bytes = serializePreset(presetStore.preset);
+    await libraryStore.storePreset(slot, bytes);
+    logI(`Library cache updated → slot ${slot}`);
+  } catch(e) {
+    // Non-critical: library cache update failed
+    console.warn('Library cache update failed:', e);
+  }
+});
+
+$('btnReqSystem').onclick = () => {
+  systemStore.request();
+  logOut('Request System Params');
+};
+
+$('btnSelectPreset').onclick = () => {
+  const n = parseInt($('presetNum').value);
+  if (isNaN(n)||n<0||n>199) { logErr('Invalid preset number'); return; }
+  midi.send(buildSelectPreset(n));
+  logOut(`Select Preset ${n}`);
+  display3.textContent = String(n).padStart(3,'0');
+};
+
+$('btnSelectDb').onclick = () => {
+  const n = parseInt($('dbNum').value);
+  if (isNaN(n)||n<0||n>199) { logErr('Invalid drumbeat number'); return; }
+  midi.send(buildSelectDrumbeat(n));
+  logOut(`Select Drumbeat ${n}`);
+  $('stDrumbeat').textContent = n;
+};
+
+$('btnOfflineEdit').onclick = () => {
+  presetStore.reset();
+  drumbeatStore.reset();
+  showEditor();
+  logI('Editing default preset & drumbeat offline');
+};
+
+// ── MIDI event handlers ────────────────────────────────────────────────────
+midi.on('sysex:identity', ({ version }) => {
+  const sw = version ?? '?';
+  logIn(`Identity Reply: AdrenaLinn III fw${sw}`);
+  $('stFw').textContent = sw;
+  display3.textContent  = 'AL3';
+  midi.deviceName = `AdrenaLinn III (v${sw})`;
+  setConnected(true, midi.deviceName);
+  if (!_synced) { _synced = true; syncFromDevice(); }
+});
+
+midi.on('sysex:presetEditBuf', ({ raw }) => {
+  logIn(`Preset Edit Buffer: ${raw.length} bytes`);
+  showEditor();
+});
+
+midi.on('sysex:preset', ({ raw }) => {
+  logIn(`Preset: ${raw.length} bytes`);
+  showEditor();
+  // Auto-store to library if we know the slot number
+  const slot = presetStore.number;
+  if (slot !== null && slot >= 0 && slot <= 199)
+    libraryStore.storePreset(slot, raw).catch(()=>{});
+});
+
+midi.on('sysex:drumbeatEditBuf', ({ raw }) => {
+  logIn(`Drumbeat Edit Buffer: ${raw.length} bytes`);
+  showEditor();
+  if (!_syncing) activateTab('drumbeat'); // an explicit Pull Drumbeat jumps to the tab; the connect-time read doesn't
+});
+
+midi.on('sysex:drumbeat', ({ raw }) => {
+  logIn(`Drumbeat: ${raw.length} bytes`);
+  showEditor();
+  const slot = drumbeatStore.number;
+  if (slot !== null && slot >= 0 && slot <= 199)
+    libraryStore.storeDrumbeat(slot, raw).catch(()=>{});
+});
+
+midi.on('sysex:system', ({ raw }) => {
+  logIn(`System Params: ${raw.length} bytes`);
+  if (raw[0] !== undefined) $('stPreset').textContent   = raw[0];
+  if (raw[1] !== undefined) $('stDrumbeat').textContent = raw[1];
+  if (raw[2] !== undefined) $('stTempo').textContent    = raw[2];
+});
+
+midi.on('sysex:saveComplete', () => {
+  logIn('Save Complete ✓');
+  display3.textContent = 'SAV';
+  setTimeout(() => {
+    display3.textContent = presetStore.number !== null
+      ? String(presetStore.number).padStart(3,'0')
+      : '---';
+  }, 2000);
+});
+
+// ── MIDI Clock → display step counter ─────────────────────────────────────
+let _clockStep  = 0;
+let _clockCount = 0;
+let _clockPlaying = false;
+
+midi.on('start', () => {
+  _clockPlaying = true;
+  _clockStep    = 0;
+  _clockCount   = 0;
+});
+midi.on('stop', () => {
+  _clockPlaying = false;
+  // Restore normal display after brief pause
+  setTimeout(() => {
+    display3.textContent = presetStore.number !== null
+      ? String(presetStore.number).padStart(3,'0')
+      : '---';
+  }, 800);
+});
+midi.on('clock', () => {
+  if (!_clockPlaying) return;
+  _clockCount = (_clockCount + 1) % 6;   // 6 clocks per 1/16 note
+  if (_clockCount === 0) {
+    _clockStep = (_clockStep + 1) % 32;
+    // Show step as S.XX in the display (S prefix + 2-digit step)
+    display3.textContent = 'S' + String(_clockStep + 1).padStart(2, '0');
+  }
+});
+
+midi.on('programChange', ({ program }) => {
+  logIn(`Program Change → ${program}`);
+  $('stPreset').textContent = program;
+  display3.textContent = String(program).padStart(3,'0');
+});
+
+// Highlight seq tab when sequence effect is selected
+presetStore.on('change', ({ field, value }) => {
+  if (field === 'modEffect' && [7,8,9].includes(value) && seqEditor) {
+    const seqTitle = document.querySelector('.card[data-card="seq"] .card-title');
+    if (seqTitle) {
+      seqTitle.style.color = 'var(--accent2)';
+      setTimeout(() => { seqTitle.style.color = ''; }, 2500);
+    }
+  }
+});
+
+midi.on('clock', () => {
+  setFoot('footClock', true);
+  clearTimeout(window._clt);
+  window._clt = setTimeout(()=>setFoot('footClock',false), 250);
+});
+
+midi.on('sysex', () => {
+  setFoot('footSysEx', true);
+  clearTimeout(window._sxt);
+  window._sxt = setTimeout(()=>setFoot('footSysEx',false), 300);
+});
+
+midi.on('raw', ({ data }) => {
+  if (data[0]!==0xF8 && data[0]!==0xFE && data[0]!==0xF0)
+    log('in', data.map(b=>b.toString(16).padStart(2,'0')).join(' '));
+});
+
+midi.on('portChange', () => { populatePorts(); tryAutoConnect(); });
+
+// ── Init ──────────────────────────────────────────────────────────────────
+(async () => {
+  logI('Initializing Web MIDI…');
+  try {
+    await midi.init();
+    populatePorts();
+    setFoot('footMidi', true);
+    logI('Web MIDI ready ✓');
+    tryAutoConnect();
+  } catch(e) {
+    logErr(e.message);
+    badge.classList.add('error');
+    devName.textContent = 'MIDI not available';
+  }
+
+  // Init library store (IndexedDB)
+  try {
+    await libraryStore.init();
+    const np = libraryStore.presets.size;
+    const nd = libraryStore.drumbeats.size;
+    logI(`Library loaded: ${np} presets, ${nd} drumbeats cached`);
+    // Show library stat in sidebar
+    const libBadge = $('libBadge');
+    if (libBadge) libBadge.textContent = `${np}P / ${nd}D`;
+  } catch(e) {
+    logErr('Library init failed: ' + e.message);
+  }
+
+  libraryStore.on('libraryChange', () => {
+    const libBadge = $('libBadge');
+    if (libBadge) {
+      libBadge.textContent =
+        `${libraryStore.presets.size}P / ${libraryStore.drumbeats.size}D`;
+    }
+  });
+})();
+
+// ── Offline support (Service Worker) ────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  // A new Service Worker taking over means fresh files are cached, but this page
+  // was served from the old cache: reload once so it isn't left running a stale
+  // copy. Skipped on a first install (no previous controller) and while there
+  // are unsaved edits (it then updates on the next load).
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading || presetStore.dirty || drumbeatStore.dirty) return;
+    reloading = true;
+    location.reload();
+  });
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(err => {
+      console.warn('Service Worker registration failed:', err);
+    });
+  });
+}
+</script>
+</body>
+</html>

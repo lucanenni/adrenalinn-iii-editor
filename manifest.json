@@ -1,0 +1,13 @@
+{
+  "name": "AdrenaLinn III Web Editor",
+  "short_name": "AdrenaLinn III",
+  "description": "Web editor for the AdrenaLinn III effects processor by Roger Linn Design",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d0d0f",
+  "theme_color": "#e8502a",
+  "icons": [
+    { "src": "icon.svg", "type": "image/svg+xml", "sizes": "any" }
+  ]
+}

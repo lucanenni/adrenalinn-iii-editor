@@ -1,0 +1,34 @@
+# Node (only if using serve or other local tools)
+node_modules/
+.npm/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Claude Code — personal local settings (not shared)
+.claude/
+
+# Build artifacts (not present in this project)
+dist/
+build/
+
+# Local backups
+*.bak
+*.orig
+
+# Log
+*.log
+
+# Temp files used for syntax checks
+/tmp/
+
+# Personal device backups (presets/drumbeats dumped from the pedal)
+backups/

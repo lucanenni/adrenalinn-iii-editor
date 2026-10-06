@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AdrenaLinn III — Self-Test</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0d0f;--bg2:#141418;--bg3:#1c1c22;--border:#2a2a35;
+  --text:#e8e8ec;--text2:#9090a0;--text3:#5a5a68;
+  --green:#3ecf6a;--red:#ff5555;--font-ui:'DM Mono','Courier New',monospace;
+}
+html,body{background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size:12px;padding:20px}
+h1{font-size:16px;margin-bottom:4px}
+p.sub{color:var(--text3);font-size:11px;margin-bottom:16px}
+#summary{font-size:14px;font-weight:700;padding:10px 14px;border-radius:6px;margin-bottom:14px;display:inline-block}
+#summary.pass{background:#1a3a22;color:var(--green)}
+#summary.fail{background:#3a1a1a;color:var(--red)}
+.group{margin-bottom:18px}
+.group-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);border-bottom:1px solid var(--border);padding-bottom:4px;margin-bottom:6px}
+.row{display:flex;gap:8px;padding:2px 0;align-items:baseline}
+.row.bad{background:#2a1414;border-radius:3px;padding:2px 6px}
+.dot{width:14px;flex-shrink:0}
+.row.ok .dot{color:var(--green)}
+.row.bad .dot{color:var(--red)}
+.name{color:var(--text2);flex-shrink:0}
+.detail{color:var(--red);font-size:11px}
+</style>
+</head>
+<body>
+<h1>AdrenaLinn III — Data Round-Trip Self-Test</h1>
+<p class="sub">
+  Independently re-derives the expected value for every packed byte/nibble in
+  presetData.js and drumbeatData.js and checks it against parsePreset/serializePreset
+  and parseDrumbeat/serializeDrumbeat. Same checks as `node test/run.mjs` (see
+  test/roundtrip.mjs) — this page just renders them visually.
+</p>
+<div id="summary">Running…</div>
+<div id="results"></div>
+
+<script type="module">
+import { runRoundTripTests } from './test/roundtrip.mjs';
+
+const groups = runRoundTripTests();
+
+let passed = 0, total = 0;
+const html = groups.map(g => {
+  const rows = g.checks.map(c => {
+    total++; if (c.pass) passed++;
+    return `<div class="row ${c.pass ? 'ok' : 'bad'}">
+      <span class="dot">${c.pass ? '✓' : '✗'}</span>
+      <span class="name">${c.name}</span>
+      ${c.pass ? '' : `<span class="detail">expected ${JSON.stringify(c.expected)} — got ${JSON.stringify(c.actual)}</span>`}
+    </div>`;
+  }).join('');
+  return `<div class="group"><div class="group-title">${g.name}</div>${rows}</div>`;
+}).join('');
+
+const failed = total - passed;
+const summary = document.getElementById('summary');
+summary.className = failed ? 'fail' : 'pass';
+summary.textContent = failed ? `${passed}/${total} passed — ${failed} FAILED` : `${passed}/${total} passed`;
+document.getElementById('results').innerHTML = html;
+
+console.log(`Self-test: ${passed}/${total} passed${failed ? `, ${failed} FAILED` : ''}`);
+</script>
+</body>
+</html>
